@@ -27,7 +27,11 @@ type Resp struct {
 	reader *bufio.Reader
 }
 
-func NewResp(rd io.Reader) *Resp {
+type Writer struct {
+	writer io.Writer
+}
+
+func NewRespReader(rd io.Reader) *Resp {
 	return &Resp{
 		reader: bufio.NewReader(rd),
 	}
@@ -49,6 +53,21 @@ func (r *Resp) Read() (Value, error) {
 		fmt.Printf("Unknown type: %v", string(_type))
 		return Value{}, nil
 	}
+}
+
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{writer: w}
+}
+
+func (w *Writer) Write(v Value) error {
+	var bytes = v.Converter()
+
+	_, err := w.writer.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *Resp) readArray() (Value, error) {
@@ -115,4 +134,66 @@ func (r *Resp) readLine() (line []byte, numberOfBytes int, err error) {
 		}
 	}
 	return line[:len(line)-2], numberOfBytes, nil
+}
+
+func (v Value) Converter() []byte {
+	switch v.typ {
+	case "string":
+		return v.convertString()
+	case "array":
+		return v.convertArray()
+	case "bulk":
+		return v.convertBulk()
+	case "null":
+		return v.convertNull()
+	case "error":
+		return v.convertError()
+	default:
+		return []byte{}
+	}
+}
+
+func (v Value) convertString() []byte {
+	var bytes []byte
+	bytes = append(bytes, STRING)
+	bytes = append(bytes, v.str...)
+	bytes = append(bytes, '\r', '\n')
+
+	return bytes
+}
+
+func (v Value) convertArray() []byte {
+	var bytes []byte
+	bytes = append(bytes, ARRAY)
+	bytes = append(bytes, strconv.Itoa(len(v.array))...)
+	bytes = append(bytes, '\r', '\n')
+
+	for i:=0; i<len(v.array); i++ {
+		bytes = append(bytes, v.array[i].Converter()...)
+	}
+	return bytes
+}
+
+func (v Value) convertBulk() []byte {
+	var bytes []byte
+	bytes = append(bytes, BULK)
+	bytes = append(bytes, strconv.Itoa(len(v.bulk))...)
+	bytes = append(bytes, '\r', '\n')
+	bytes = append(bytes, v.bulk...)
+	bytes = append(bytes, '\r', '\n')
+
+	return bytes
+}
+
+func (v Value) convertNull() []byte {
+	return []byte("$-1\r\n")
+}
+
+func (v Value) convertError() []byte {
+	var bytes []byte
+	bytes = append(bytes, ERROR)
+	bytes = append(bytes, v.str...)
+	bytes = append(bytes, '\r', '\n')
+
+	return bytes
 }
