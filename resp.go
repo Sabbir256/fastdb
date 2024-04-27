@@ -1,3 +1,8 @@
+/*
+	Redis Serialization Protocol (RESP) handler for go.
+	Reads and Writes in RESP format from an io buffer.
+*/
+
 package main
 
 import (
