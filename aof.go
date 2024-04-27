@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -57,19 +57,23 @@ func (aof *Aof) Write(v Value) error {
 	return nil
 }
 
-func (aof *Aof) Read(fn func(Value)) {
+func (aof *Aof) Read(fn func(Value)) error{
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
-	
+
 	for {
 		resp := NewRespReader(aof.rd)
 
 		value, err := resp.Read()
 		if err != nil {
-			fmt.Println(err)
-			return
+			if err == io.EOF {
+				break
+			}
+			return err
 		}
 
 		fn(value)
 	}
+
+	return nil
 }
